@@ -11,6 +11,7 @@ module.exports = {
     path: path.resolve(__dirname, 'dist'),
     filename: 'bundle.[contenthash].js',
     clean: true, // limpia /dist en cada compilación
+    publicPath: '/buscador-palabras/', // 👈 Actualizado con el nombre exacto de tu repo
   },
 
   module: {
