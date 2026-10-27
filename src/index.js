@@ -1,102 +1,105 @@
-/**
- * Punto de entrada de la aplicación.
- * Conecta el DOM con la lógica de búsqueda (processText) y las alertas.
- */
-import 'bootstrap/dist/css/bootstrap.min.css';
-import './styles/main.css';
+import "bootstrap/dist/css/bootstrap.min.css"; // primero Bootstrap
+import "./styles/main.css";                    // después tus estilos
 
-import { processText, escapeHtml } from './js/textProcessor';
-import { showAlert, clearAlerts } from './js/alerts';
+import { showAlert, clearAlerts } from "./js/alerts.js";
+import { findMatches, replaceMatches } from "./js/textProcessor.js";
 
-// ---------- Referencias al DOM ----------
-const form = document.getElementById('search-form');
-const textInput = document.getElementById('text-input');
-const termInput = document.getElementById('term-input');
-const clearButton = document.getElementById('clear-btn');
-const alertArea = document.getElementById('alert-area');
-const counter = document.getElementById('counter');
-const counterNumber = document.getElementById('counter-number');
-const counterLabel = document.getElementById('counter-label');
-const resultText = document.getElementById('result-text');
+const alertArea = document.getElementById("alert-area");
+const form = document.getElementById("search-form");
+const textInput = document.getElementById("text-input");
+const termInput = document.getElementById("term-input");
+const replaceInput = document.getElementById("replace-input");
+const replaceBtn = document.getElementById("replace-btn");
+const clearBtn = document.getElementById("clear-btn");
+const counter = document.getElementById("counter");
+const counterNumber = document.getElementById("counter-number");
+const counterLabel = document.getElementById("counter-label");
+const resultText = document.getElementById("result-text");
 
-const EMPTY_RESULT_MESSAGE = 'El texto con las coincidencias marcadas aparecerá aquí.';
+const EMPTY_MSG = "El texto con las coincidencias marcadas aparecerá aquí.";
 
-// ---------- Funciones de interfaz ----------
-
-/** Devuelve el panel de resultados a su estado inicial. */
 function resetResult() {
   counter.hidden = true;
-  resultText.classList.add('result-text--empty');
-  resultText.textContent = EMPTY_RESULT_MESSAGE;
+  resultText.className = "result-text result-text--empty";
+  resultText.textContent = EMPTY_MSG;
 }
 
-/**
- * Pinta el contador y el texto procesado.
- * @param {number} count Número de coincidencias.
- * @param {string} term Término buscado.
- * @param {string} html Texto (ya escapado) con las coincidencias marcadas.
- */
-function renderResult(count, term, html) {
-  counter.hidden = false;
-  counterNumber.textContent = count;
-  counterLabel.textContent =
-    count === 1 ? `coincidencia de «${term}»` : `coincidencias de «${term}»`;
-
-  resultText.classList.remove('result-text--empty');
-  resultText.innerHTML = html;
-}
-
-/**
- * Valida los campos. Devuelve un mensaje de error o null si todo está bien.
- * @param {string} text
- * @param {string} term
- * @returns {string|null}
- */
-function validate(text, term) {
-  if (!text && !term) return 'Escribe un texto y la palabra que quieres buscar.';
-  if (!text) return 'El campo de texto está vacío. Escribe o pega un texto.';
-  if (!term) return 'Escribe una palabra o carácter para buscar.';
-  return null;
-}
-
-// ---------- Manejadores de eventos ----------
-
-/** Acción del botón "Buscar" (también se activa con Enter). */
-function handleSearch(event) {
-  event.preventDefault(); // evita recargar la página
-
-  const text = textInput.value;
-  const term = termInput.value.trim();
-
+// ---------- BUSCAR ----------
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
   clearAlerts(alertArea);
 
-  const error = validate(text.trim(), term);
-  if (error) {
-    resetResult();
-    showAlert(alertArea, error, 'warning');
-    return;
+  const text = textInput.value;
+  const term = termInput.value;
+
+  if (!text.trim()) return showAlert(alertArea, "Escribe o pega un texto antes de buscar.");
+  if (!term) return showAlert(alertArea, "Escribe la palabra o carácter que quieres buscar.");
+
+  const { total, parts } = findMatches(text, term);
+
+  resultText.className = "result-text";
+  resultText.textContent = "";
+  for (const p of parts) {
+    if (p.match) {
+      const mark = document.createElement("mark");
+      mark.textContent = p.text;
+      resultText.append(mark);
+    } else {
+      resultText.append(p.text);
+    }
   }
 
-  const { count, html } = processText(text, term);
+  counterNumber.textContent = total;
+  counterLabel.textContent =
+    total === 1 ? `coincidencia con “${term}”` : `coincidencias con “${term}”`;
+  counter.hidden = false;
+});
 
-  if (count === 0) {
-    // Se muestra el texto original sin marcas y un aviso
-    renderResult(0, term, escapeHtml(text));
-    showAlert(alertArea, `No se encontró «${term}» en el texto.`, 'info');
-    return;
+// ---------- REEMPLAZAR ----------
+replaceBtn.addEventListener("click", () => {
+  clearAlerts(alertArea);
+
+  const text = textInput.value;
+  const term = termInput.value;
+  const replacement = replaceInput.value;
+
+  if (!text.trim()) return showAlert(alertArea, "Escribe o pega un texto antes de reemplazar.");
+  if (!term) return showAlert(alertArea, "Escribe la palabra o carácter que quieres reemplazar.");
+
+  const { total, parts, newText } = replaceMatches(text, term, replacement);
+
+  if (total === 0) {
+    return showAlert(alertArea, `No se encontró “${term}” en el texto, no hay nada que reemplazar.`);
   }
 
-  renderResult(count, term, html);
-}
+  // El textarea queda con el texto nuevo, así puedes seguir buscando sobre él
+  textInput.value = newText;
 
-/** Acción del botón "Limpiar": restablece campos, alertas y resultado. */
-function handleClear() {
-  form.reset();
+  resultText.className = "result-text";
+  resultText.textContent = "";
+  for (const p of parts) {
+    if (p.replaced) {
+      const mark = document.createElement("mark");
+      mark.className = "mark--replaced";
+      mark.textContent = p.text;
+      resultText.append(mark);
+    } else {
+      resultText.append(p.text);
+    }
+  }
+
+  counterNumber.textContent = total;
+  counterLabel.textContent =
+    total === 1 ? `reemplazo de “${term}”` : `reemplazos de “${term}”`;
+  counter.hidden = false;
+});
+
+// ---------- LIMPIAR ----------
+clearBtn.addEventListener("click", () => {
+  textInput.value = "";
+  termInput.value = "";
+  replaceInput.value = "";
   clearAlerts(alertArea);
   resetResult();
   textInput.focus();
-}
-
-// ---------- Inicialización ----------
-form.addEventListener('submit', handleSearch);
-clearButton.addEventListener('click', handleClear);
+});

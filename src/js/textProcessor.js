@@ -1,58 +1,46 @@
-/**
- * Lógica pura de búsqueda y resaltado.
- * No toca el DOM: recibe texto y devuelve datos, lo que facilita probarla.
- */
-
-/**
- * Escapa los caracteres especiales de RegExp para que el término
- * se busque literalmente (por ejemplo "." o "+" no son comodines).
- * @param {string} value
- * @returns {string}
- */
-const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-/**
- * Escapa HTML para insertar texto del usuario de forma segura con innerHTML
- * (evita que un "<script>" escrito en el textarea se ejecute).
- * @param {string} value
- * @returns {string}
- */
-const escapeHtml = (value) =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-
-/**
- * Busca `term` dentro de `text` sin distinguir mayúsculas/minúsculas,
- * cuenta las coincidencias y construye el HTML con cada una marcada.
- *
- * @param {string} text Texto completo donde buscar.
- * @param {string} term Palabra o carácter a buscar.
- * @returns {{ count: number, html: string }}
- */
-export function processText(text, term) {
-  // Flags: g = todas las coincidencias, i = sin distinguir mayúsculas, u = Unicode (acentos, ñ)
-  const pattern = new RegExp(escapeRegExp(term), 'giu');
-
-  let count = 0;
-  let html = '';
-  let lastIndex = 0;
-
-  for (const match of text.matchAll(pattern)) {
-    count += 1;
-    // Texto previo a la coincidencia + la coincidencia marcada con <mark>
-    html += escapeHtml(text.slice(lastIndex, match.index));
-    html += `<mark class="hit">${escapeHtml(match[0])}</mark>`;
-    lastIndex = match.index + match[0].length;
-  }
-
-  // Resto del texto después de la última coincidencia
-  html += escapeHtml(text.slice(lastIndex));
-
-  return { count, html };
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export { escapeHtml };
+/**
+ * Busca `term` en `text` sin distinguir mayúsculas.
+ * Devuelve el total y una lista de fragmentos { text, match }.
+ */
+export function findMatches(text, term) {
+  const regex = new RegExp(escapeRegExp(term), "gi");
+  const parts = [];
+  let last = 0;
+  let total = 0;
+
+  for (const m of text.matchAll(regex)) {
+    if (m.index > last) parts.push({ text: text.slice(last, m.index), match: false });
+    parts.push({ text: m[0], match: true });
+    last = m.index + m[0].length;
+    total++;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last), match: false });
+
+  return { total, parts };
+}
+
+/**
+ * Reemplaza todas las coincidencias de `term` (sin distinguir mayúsculas)
+ * por `replacement`. Devuelve el texto nuevo, el total y los fragmentos
+ * { text, replaced } para poder resaltar lo reemplazado.
+ */
+export function replaceMatches(text, term, replacement) {
+  const regex = new RegExp(escapeRegExp(term), "gi");
+  const parts = [];
+  let last = 0;
+  let total = 0;
+
+  for (const m of text.matchAll(regex)) {
+    if (m.index > last) parts.push({ text: text.slice(last, m.index), replaced: false });
+    parts.push({ text: replacement, replaced: true });
+    last = m.index + m[0].length;
+    total++;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last), replaced: false });
+
+  return { total, parts, newText: parts.map((p) => p.text).join("") };
+}

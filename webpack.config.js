@@ -1,23 +1,20 @@
-// Configuración de Webpack: empaqueta el JS (transpilado con Babel),
-// el CSS y genera el HTML final en la carpeta /dist.
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
-  // Punto de entrada: desde aquí Webpack sigue todos los imports
   entry: './src/index.js',
 
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'bundle.[contenthash].js',
-    clean: true, // limpia /dist en cada compilación
-    publicPath: '/buscador-palabras/', // 👈 Actualizado con el nombre exacto de tu repo
+    clean: true,
+    publicPath: '/buscador-palabras/', // nombre de tu repo (para GitHub Pages)
   },
 
   module: {
     rules: [
       {
-        // Transpila ES6+ a JavaScript compatible con Babel
+        // Transpila ES6+ con Babel
         test: /\.js$/,
         exclude: /node_modules/,
         use: 'babel-loader',
@@ -31,7 +28,6 @@ module.exports = {
   },
 
   plugins: [
-    // Toma src/index.html como plantilla e inyecta el bundle automáticamente
     new HtmlWebpackPlugin({
       template: './src/index.html',
       title: 'Buscador de palabras',
@@ -41,7 +37,7 @@ module.exports = {
   devServer: {
     static: path.resolve(__dirname, 'dist'),
     port: 8080,
-    open: true,
+    open: '/buscador-palabras/', // abre la ruta correcta
     hot: true,
   },
 
